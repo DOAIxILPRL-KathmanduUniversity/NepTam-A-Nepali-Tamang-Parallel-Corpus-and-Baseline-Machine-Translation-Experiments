@@ -1,0 +1,117 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Review · Nepali Audio Studio</title>
+  <meta name="description" content="Browse, play, re-record and delete Nepali sentence recordings." />
+  <link rel="stylesheet" href="/static/styles.css" />
+  <style>
+    h1 { margin: 0 0 18px; font-size: 28px; letter-spacing: -.5px; }
+    .filters { display: grid; grid-template-columns: 1.6fr repeat(4, 1fr); gap: 10px; padding: 16px; margin-bottom: 16px; }
+    table { width: 100%; border-collapse: collapse; }
+    th { text-align: left; font-size: 11.5px; text-transform: uppercase; letter-spacing: 1px; color: var(--muted); font-weight: 700; padding: 14px 14px; border-bottom: 1px solid var(--border); }
+    td { padding: 12px 14px; border-bottom: 1px solid var(--border); font-size: 14px; vertical-align: middle; }
+    tr:last-child td { border-bottom: 0; }
+    tbody tr { transition: background .15s; }
+    tbody tr:hover { background: hsla(225 30% 60% / .06); }
+    td.np { font-size: 17px; max-width: 420px; }
+    .actions { display: flex; gap: 6px; justify-content: flex-end; }
+    .pager { display: flex; justify-content: space-between; align-items: center; padding: 14px 4px 0; color: var(--muted); font-size: 14px; }
+    .pager .btns { display: flex; gap: 8px; }
+    .empty { text-align: center; padding: 50px; color: var(--dim); }
+  </style>
+</head>
+<body>
+  <main class="container">
+    <h1>Review recordings</h1>
+    <section class="panel filters">
+      <input id="q" placeholder="Search Nepali, Tamang or ID…" aria-label="Search" />
+      <select id="status" aria-label="Status">
+        <option value="all">All</option><option value="recorded">Recorded</option>
+        <option value="pending">Pending</option><option value="flagged">Flagged</option>
+      </select>
+      <select id="type" aria-label="Sentence type"><option value="">Any type</option></select>
+      <select id="tense" aria-label="Tense"><option value="">Any tense</option></select>
+      <select id="polarity" aria-label="Polarity"><option value="">Any polarity</option></select>
+    </section>
+    <section class="panel">
+      <table>
+        <thead><tr><th style="width:70px">#</th><th style="width:100px">ID</th><th>Nepali sentence</th><th style="width:120px">Status</th><th style="width:90px">Length</th><th style="width:200px;text-align:right">Actions</th></tr></thead>
+        <tbody id="rows"></tbody>
+      </table>
+    </section>
+    <div class="pager"><span id="info" class="tnum"></span>
+      <div class="btns"><button class="btn sm" id="prev">← Prev</button><button class="btn sm" id="next">Next →</button></div></div>
+    <audio id="player"></audio>
+  </main>
+  <script src="/static/common.js"></script>
+  <script>
+    renderNav('review');
+    const P = new URLSearchParams(location.search);
+    const st = { q: P.get('q') || '', status: P.get('status') || 'all', type: P.get('type') || '', tense: P.get('tense') || '',
+                 polarity: P.get('polarity') || '', flag: P.get('flag') || '', page: +(P.get('page') || 1) };
+    const player = document.getElementById('player');
+    let playingBtn = null;
+
+    async function init() {
+      const f = await api('/api/filters');
+      for (const k of ['type', 'tense', 'polarity'])
+        document.getElementById(k).insertAdjacentHTML('beforeend', f[k].map((v) => `<option>${v}</option>`).join(''));
+      for (const k of ['q', 'status', 'type', 'tense', 'polarity']) document.getElementById(k).value = st[k];
+      let t;
+      document.getElementById('q').addEventListener('input', (e) => { clearTimeout(t); t = setTimeout(() => { st.q = e.target.value; st.page = 1; refresh(); }, 250); });
+      for (const k of ['status', 'type', 'tense', 'polarity'])
+        document.getElementById(k).addEventListener('change', (e) => { st[k] = e.target.value; if (k === 'status') st.flag = ''; st.page = 1; refresh(); });
+      document.getElementById('prev').onclick = () => { st.page--; refresh(); };
+      document.getElementById('next').onclick = () => { st.page++; refresh(); };
+      refresh();
+      api('/api/stats').then((s) => updateNavProgress(s.recorded, s.total));
+    }
+
+    async function refresh() {
+      const qs = new URLSearchParams(Object.entries(st).filter(([, v]) => v !== '' && v !== 'all'));
+      history.replaceState(null, '', `/review?${qs}`);
+      const r = await api(`/api/list?${qs}&size=50`);
+      st.page = r.page;
+      const rows = document.getElementById('rows');
+      rows.innerHTML = r.items.length ? r.items.map((s) => {
+        const flags = (s.meta && s.meta.flags) || [];
+        const status = !s.recorded ? '<span class="chip pending">Pending</span>'
+          : flags.length ? `<span class="chip flag" title="${flags.map((f) => FLAG_LABELS[f]).join(', ')}">⚠ ${flags.map((f) => f).join(', ')}</span>`
+          : '<span class="chip ok">✓ Recorded</span>';
+        return `<tr data-id="${s.id}">
+          <td class="dim tnum">${s.idx + 1}</td><td class="mono" style="font-size:13px">${s.id}</td>
+          <td class="np">${s.nepali}</td><td>${status}</td>
+          <td class="tnum muted">${s.meta ? s.meta.duration.toFixed(1) + 's' : '—'}</td>
+          <td><div class="actions">
+            ${s.recorded ? '<button class="btn sm play">▶</button>' : ''}
+            <a class="btn sm" href="/record?id=${encodeURIComponent(s.id)}">🎙 ${s.recorded ? 'Redo' : 'Record'}</a>
+            ${s.recorded ? '<button class="btn sm danger del">🗑</button>' : ''}
+          </div></td></tr>`;
+      }).join('') : '<tr><td colspan="6" class="empty">Nothing matches these filters.</td></tr>';
+      document.getElementById('info').textContent = `${r.total.toLocaleString()} sentences · page ${r.page} of ${r.pages}`;
+      document.getElementById('prev').disabled = r.page <= 1;
+      document.getElementById('next').disabled = r.page >= r.pages;
+      rows.querySelectorAll('.play').forEach((b) => b.onclick = () => play(b.closest('tr').dataset.id, b));
+      rows.querySelectorAll('.del').forEach((b) => b.onclick = () => del(b.closest('tr').dataset.id));
+    }
+
+    function play(id, btn) {
+      if (playingBtn === btn && !player.paused) { player.pause(); return; }
+      if (playingBtn) playingBtn.textContent = '▶';
+      player.src = `/api/audio/${encodeURIComponent(id)}?t=${Date.now()}`; player.play();
+      playingBtn = btn; btn.textContent = '❚❚';
+      player.onended = player.onpause = () => (btn.textContent = '▶');
+    }
+
+    async function del(id) {
+      if (!confirm(`Delete recording ${id}.mp3?`)) return;
+      await api(`/api/record/${encodeURIComponent(id)}`, { method: 'DELETE' });
+      toast(`Deleted ${id}.mp3`, 'warn'); refresh();
+      api('/api/stats').then((s) => updateNavProgress(s.recorded, s.total));
+    }
+    init().catch((e) => toast(e.message, 'err'));
+  </script>
+</body>
+</html>

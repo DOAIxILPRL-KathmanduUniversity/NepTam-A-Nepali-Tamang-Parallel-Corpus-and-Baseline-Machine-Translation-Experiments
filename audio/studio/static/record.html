@@ -1,0 +1,122 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Record · Nepali Audio Studio</title>
+  <meta name="description" content="Keyboard-first recording studio for Nepali sentence audio." />
+  <link rel="stylesheet" href="/static/styles.css" />
+  <style>
+    .card { position: relative; padding: 26px 30px 24px; overflow: hidden; }
+    .card::before {
+      content: ''; position: absolute; inset: 0 0 auto 0; height: 3px; background: var(--grad); opacity: .9;
+    }
+    .card-top { display: flex; align-items: center; gap: 10px; }
+    .card-top .spacer { flex: 1; }
+    #statusChip { width: 132px; justify-content: center; }
+    .sentence {
+      min-height: 190px; display: grid; place-items: center; text-align: center;
+      font-size: clamp(30px, 4.2vw, 46px); font-weight: 700; line-height: 1.55; letter-spacing: .2px;
+      padding: 18px 10px 10px; text-wrap: balance;
+    }
+    .sentence.long { font-size: clamp(22px, 2.6vw, 30px); }
+    .tamang { min-height: 28px; text-align: center; font-size: 18px; color: var(--muted); }
+    .tamang.hidden { visibility: hidden; }
+    .meta-row { display: flex; justify-content: center; gap: 8px; margin-top: 12px; flex-wrap: wrap; }
+
+    .jump { display: flex; gap: 8px; align-items: center; }
+    .jump input { width: 150px; height: 32px; font-size: 13px; }
+
+    /* recorder: every element has a fixed size, nothing reflows */
+    .rec { margin-top: 18px; padding: 18px 20px 20px; }
+    .wave-wrap { position: relative; height: 128px; border-radius: 14px; overflow: hidden;
+      background: linear-gradient(180deg, hsla(228 30% 4% / .7), hsla(228 30% 10% / .5)); border: 1px solid var(--border); }
+    canvas#wave { width: 100%; height: 100%; display: block; }
+    .wave-overlay { position: absolute; inset: 0; display: grid; place-items: center; color: var(--dim); font-size: 14px; pointer-events: none; }
+    .rec-info { display: grid; grid-template-columns: 120px 1fr 220px; align-items: center; gap: 16px; margin: 14px 2px 16px; height: 28px; }
+    .timer { font-family: 'JetBrains Mono', monospace; font-size: 22px; font-weight: 500; }
+    .state-text { font-size: 14px; color: var(--muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .state-text b { color: var(--text); }
+    .meter { height: 8px; border-radius: 99px; background: hsla(225 30% 60% / .14); overflow: hidden; position: relative; }
+    .meter > span { position: absolute; inset: 0 auto 0 0; width: 0; background: linear-gradient(90deg, var(--ok), var(--warn) 75%, var(--danger)); transition: width .06s linear; }
+
+    .controls { display: grid; grid-template-columns: 110px 110px 1fr 110px 190px 110px; gap: 10px; }
+    .controls .btn { width: 100%; }
+    #recBtn { height: 56px; font-size: 16px; border-radius: 14px; }
+    .controls .btn:not(#recBtn) { height: 56px; }
+    #recBtn.idle { background: hsla(352 90% 60% / .14); border-color: hsla(352 90% 60% / .45); color: hsl(352 100% 80%); }
+    #recBtn.recording { background: var(--rec); border-color: transparent; color: #fff; animation: pulse 1.4s infinite; }
+    .dot { width: 12px; height: 12px; border-radius: 50%; background: currentColor; flex: none; }
+    #recBtn.recording .dot { border-radius: 3px; background: #fff; }
+    @keyframes pulse { 0% { box-shadow: 0 0 0 0 hsla(352 90% 60% / .55); } 70% { box-shadow: 0 0 0 14px hsla(352 90% 60% / 0); } 100% { box-shadow: 0 0 0 0 hsla(352 90% 60% / 0); } }
+
+    .options { display: flex; gap: 22px; align-items: center; margin-top: 16px; font-size: 13.5px; color: var(--muted); flex-wrap: wrap; }
+    .toggle { display: inline-flex; align-items: center; gap: 8px; cursor: pointer; user-select: none; }
+    .toggle input { display: none; }
+    .toggle .sw { width: 34px; height: 20px; border-radius: 99px; background: hsla(225 30% 60% / .25); position: relative; transition: background .2s; }
+    .toggle .sw::after { content: ''; position: absolute; top: 3px; left: 3px; width: 14px; height: 14px; border-radius: 50%; background: #fff; transition: transform .2s; }
+    .toggle input:checked + .sw { background: var(--accent); }
+    .toggle input:checked + .sw::after { transform: translateX(14px); }
+    .hints { margin-left: auto; display: flex; gap: 14px; flex-wrap: wrap; }
+    .hints span { display: inline-flex; gap: 6px; align-items: center; }
+
+    .flagbox { min-height: 22px; margin-top: 12px; display: flex; gap: 8px; flex-wrap: wrap; }
+    .done { text-align: center; padding: 60px 20px; }
+  </style>
+</head>
+<body>
+  <main class="container">
+    <section class="panel card" id="card">
+      <div class="card-top">
+        <span class="chip id mono" id="idChip">—</span>
+        <span class="chip tnum" id="idxChip">— / —</span>
+        <span class="chip pending" id="statusChip">Pending</span>
+        <span class="spacer"></span>
+        <form class="jump" id="jumpForm" autocomplete="off">
+          <input id="jumpInput" placeholder="Go to # or ID" aria-label="Jump to index or sentence id" />
+          <button class="btn sm" type="submit">Go</button>
+        </form>
+      </div>
+      <h1 class="sentence np" id="sentence">…</h1>
+      <div class="tamang np hidden" id="tamang">—</div>
+      <div class="meta-row" id="metaRow"></div>
+      <div class="flagbox" id="flagbox"></div>
+    </section>
+
+    <section class="panel rec">
+      <div class="wave-wrap">
+        <canvas id="wave"></canvas>
+        <div class="wave-overlay" id="waveOverlay">Press <span class="kbd" style="margin:0 6px">Space</span> to start recording</div>
+      </div>
+      <div class="rec-info">
+        <div class="timer tnum" id="timer">00:00.0</div>
+        <div class="state-text" id="stateText">Ready</div>
+        <div class="meter" title="Input level"><span id="meter"></span></div>
+      </div>
+      <div class="controls">
+        <button class="btn" id="prevBtn" title="Previous (←)">◀ Prev</button>
+        <button class="btn" id="redoBtn" title="Discard take (R)">↺ Redo</button>
+        <button class="btn idle" id="recBtn" title="Start / stop (Space)"><span class="dot"></span><span id="recLabel">Record</span><span class="kbd">Space</span></button>
+        <button class="btn" id="playBtn" title="Play (P)">▶ Play</button>
+        <button class="btn primary" id="saveBtn" title="Save & next (Enter)">Save &amp; Next <span class="kbd">⏎</span></button>
+        <button class="btn" id="nextBtn" title="Next (→)">Next ▶</button>
+      </div>
+      <div class="options">
+        <label class="toggle"><input type="checkbox" id="autoSave" /><span class="sw"></span>Auto-save when I stop</label>
+        <label class="toggle"><input type="checkbox" id="showTamang" /><span class="sw"></span>Show Tamang (T)</label>
+        <div class="hints dim">
+          <span><span class="kbd">Space</span> rec/stop</span>
+          <span><span class="kbd">⏎</span> save · next</span>
+          <span><span class="kbd">R</span> redo</span>
+          <span><span class="kbd">P</span> play</span>
+          <span><span class="kbd">← →</span> move</span>
+          <span><span class="kbd">N</span> next pending</span>
+        </div>
+      </div>
+    </section>
+    <audio id="player" preload="none"></audio>
+  </main>
+  <script src="/static/common.js"></script>
+  <script src="/static/record.js"></script>
+</body>
+</html>

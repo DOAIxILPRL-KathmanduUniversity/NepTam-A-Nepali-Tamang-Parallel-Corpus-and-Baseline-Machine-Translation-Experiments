@@ -1,0 +1,159 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Dashboard · Nepali Audio Studio</title>
+  <meta name="description" content="Recording progress, coverage and quality for the Nepali speech dataset." />
+  <link rel="stylesheet" href="/static/styles.css" />
+  <style>
+    h1 { margin: 0 0 4px; font-size: 28px; letter-spacing: -.5px; }
+    .sub { margin: 0 0 24px; color: var(--muted); }
+    .hero { display: grid; grid-template-columns: 300px 1fr; gap: 18px; }
+    .ring-wrap { display: grid; place-items: center; padding: 24px; }
+    .ring { position: relative; width: 210px; height: 210px; }
+    .ring svg { transform: rotate(-90deg); }
+    .ring .c { position: absolute; inset: 0; display: grid; place-items: center; text-align: center; }
+    .ring .pct { font-size: 40px; font-weight: 800; letter-spacing: -1px; }
+    .ring .lbl { font-size: 12px; color: var(--muted); text-transform: uppercase; letter-spacing: 1.2px; }
+    .ring-cta { margin-top: 18px; }
+    .cards { display: grid; grid-template-columns: repeat(3, 1fr); gap: 14px; }
+    .stat { padding: 18px 20px; }
+    .stat .v { font-size: 30px; font-weight: 800; letter-spacing: -.5px; }
+    .stat .k { font-size: 12px; color: var(--muted); text-transform: uppercase; letter-spacing: 1px; margin-top: 2px; }
+    .stat .h { font-size: 13px; color: var(--dim); margin-top: 6px; }
+    .row2 { display: grid; grid-template-columns: 1.4fr 1fr; gap: 18px; margin-top: 18px; }
+    .row3 { display: grid; grid-template-columns: repeat(3, 1fr); gap: 18px; margin-top: 18px; }
+    .chart { display: flex; align-items: flex-end; gap: 8px; height: 180px; padding-top: 10px; }
+    .bar-col { flex: 1; display: flex; flex-direction: column; align-items: center; gap: 6px; height: 100%; justify-content: flex-end; }
+    .bar { width: 100%; border-radius: 8px 8px 3px 3px; background: var(--grad); min-height: 3px; transition: height .6s cubic-bezier(.2,.8,.2,1); position: relative; }
+    .bar.zero { background: hsla(225 30% 60% / .15); }
+    .bar-col .n { font-size: 11px; color: var(--muted); height: 14px; }
+    .bar-col .d { font-size: 10.5px; color: var(--dim); }
+    .bd-item { margin-bottom: 14px; }
+    .bd-top { display: flex; justify-content: space-between; font-size: 14px; margin-bottom: 6px; }
+    .bd-top span:last-child { color: var(--muted); }
+    .track { height: 8px; border-radius: 99px; background: hsla(225 30% 60% / .14); overflow: hidden; }
+    .track > span { display: block; height: 100%; background: var(--grad); border-radius: 99px; transition: width .6s ease; }
+    .flag-row { display: flex; justify-content: space-between; align-items: center; padding: 10px 0; border-bottom: 1px solid var(--border); font-size: 14px; }
+    .flag-row:last-child { border-bottom: 0; }
+    .recent-item { display: grid; grid-template-columns: 34px 1fr auto; gap: 12px; align-items: center; padding: 9px 0; border-bottom: 1px solid var(--border); }
+    .recent-item:last-child { border-bottom: 0; }
+    .recent-item .np { font-size: 16px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .play-mini { width: 34px; height: 34px; border-radius: 50%; padding: 0; }
+    .empty { color: var(--dim); font-size: 14px; padding: 12px 0; }
+    @media (max-width: 900px) { .hero, .row2, .row3 { grid-template-columns: 1fr; } .cards { grid-template-columns: 1fr 1fr; } }
+  </style>
+</head>
+<body>
+  <main class="container">
+    <h1>Dashboard</h1>
+    <p class="sub">Progress and quality of the Nepali sentence recordings in <span class="mono">audio/data/</span></p>
+
+    <section class="hero">
+      <div class="panel ring-wrap">
+        <div class="ring">
+          <svg width="210" height="210" viewBox="0 0 210 210">
+            <defs><linearGradient id="g" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="hsl(248 90% 66%)"/><stop offset="1" stop-color="hsl(190 90% 55%)"/></linearGradient></defs>
+            <circle cx="105" cy="105" r="92" fill="none" stroke="hsla(225,30%,60%,.14)" stroke-width="14"/>
+            <circle id="ringArc" cx="105" cy="105" r="92" fill="none" stroke="url(#g)" stroke-width="14" stroke-linecap="round" stroke-dasharray="578" stroke-dashoffset="578" style="transition: stroke-dashoffset 1s cubic-bezier(.2,.8,.2,1)"/>
+          </svg>
+          <div class="c"><div><div class="pct tnum" id="pct">0%</div><div class="lbl">complete</div></div></div>
+        </div>
+        <a class="btn primary ring-cta" href="/record">🎙 Continue recording</a>
+      </div>
+      <div class="cards">
+        <div class="panel stat"><div class="v tnum" id="sRecorded">–</div><div class="k">Recorded</div><div class="h" id="sTotal"></div></div>
+        <div class="panel stat"><div class="v tnum" id="sPending">–</div><div class="k">Pending</div><div class="h" id="sEta"></div></div>
+        <div class="panel stat"><div class="v tnum" id="sToday">–</div><div class="k">Today</div><div class="h" id="sStreak"></div></div>
+        <div class="panel stat"><div class="v tnum" id="sHours">–</div><div class="k">Audio collected</div><div class="h">after trimming silence</div></div>
+        <div class="panel stat"><div class="v tnum" id="sAvg">–</div><div class="k">Avg clip length</div><div class="h">seconds per sentence</div></div>
+        <div class="panel stat"><div class="v tnum" id="sFlagged">–</div><div class="k">Need attention</div><div class="h"><a href="/review?status=flagged" style="color:var(--accent-2)">Review flagged →</a></div></div>
+      </div>
+    </section>
+
+    <section class="row2">
+      <div class="panel panel-pad">
+        <h2 class="panel-title">Recordings · last 14 days</h2>
+        <div class="chart" id="chart"></div>
+      </div>
+      <div class="panel panel-pad">
+        <h2 class="panel-title">Quality flags</h2>
+        <div id="flags"></div>
+      </div>
+    </section>
+
+    <section class="row3">
+      <div class="panel panel-pad"><h2 class="panel-title">By sentence type</h2><div id="bdType"></div></div>
+      <div class="panel panel-pad"><h2 class="panel-title">By tense</h2><div id="bdTense"></div></div>
+      <div class="panel panel-pad"><h2 class="panel-title">By polarity</h2><div id="bdPolarity"></div></div>
+    </section>
+
+    <section class="panel panel-pad" style="margin-top:18px">
+      <h2 class="panel-title">Latest recordings</h2>
+      <div id="recent"></div>
+    </section>
+    <audio id="player"></audio>
+  </main>
+  <script src="/static/common.js"></script>
+  <script>
+    renderNav('dashboard');
+    const player = document.getElementById('player');
+    let playing = null;
+
+    function breakdown(el, obj, order) {
+      const keys = order ? order.filter((k) => obj[k]).concat(Object.keys(obj).filter((k) => !order.includes(k))) : Object.keys(obj);
+      document.getElementById(el).innerHTML = keys.map((k) => {
+        const { total, recorded } = obj[k]; const p = total ? recorded / total * 100 : 0;
+        return `<div class="bd-item"><div class="bd-top"><span>${k}</span><span class="tnum">${recorded} / ${total} · ${p.toFixed(1)}%</span></div>
+                <div class="track"><span style="width:${p}%"></span></div></div>`;
+      }).join('');
+    }
+
+    function playClip(id, btn) {
+      if (playing === id && !player.paused) { player.pause(); return; }
+      document.querySelectorAll('.play-mini').forEach((b) => (b.textContent = '▶'));
+      player.src = `/api/audio/${encodeURIComponent(id)}?t=${Date.now()}`; player.play(); playing = id; btn.textContent = '❚❚';
+      player.onended = player.onpause = () => (btn.textContent = '▶');
+    }
+
+    (async () => {
+      const s = await api('/api/stats');
+      updateNavProgress(s.recorded, s.total);
+      const pct = s.recorded / s.total;
+      document.getElementById('pct').textContent = `${(pct * 100).toFixed(pct < 0.1 ? 1 : 0)}%`;
+      requestAnimationFrame(() => (document.getElementById('ringArc').style.strokeDashoffset = 578 * (1 - pct)));
+      const set = (id, v) => (document.getElementById(id).textContent = v);
+      set('sRecorded', s.recorded.toLocaleString()); set('sTotal', `of ${s.total.toLocaleString()} sentences`);
+      set('sPending', s.pending.toLocaleString()); set('sEta', s.avg_seconds ? `≈ ${fmtDur(s.est_remaining_seconds)} of audio left` : 'record a few to estimate');
+      set('sToday', s.today.toLocaleString()); set('sStreak', s.streak_days ? `🔥 ${s.streak_days}-day streak` : 'no streak yet');
+      set('sHours', fmtDur(s.total_seconds)); set('sAvg', s.avg_seconds.toFixed(1)); set('sFlagged', s.flagged_total);
+
+      const days = Object.entries(s.per_day), mx = Math.max(1, ...days.map((d) => d[1]));
+      document.getElementById('chart').innerHTML = days.map(([d, n], i) => {
+        const dt = new Date(d + 'T00:00'); const lbl = i === days.length - 1 ? 'Today' : dt.toLocaleDateString(undefined, { day: 'numeric', month: 'short' });
+        return `<div class="bar-col"><div class="n tnum">${n || ''}</div><div class="bar ${n ? '' : 'zero'}" style="height:${n ? Math.max(4, n / mx * 100) : 2}%"></div><div class="d">${lbl}</div></div>`;
+      }).join('');
+
+      const fl = Object.keys(FLAG_LABELS);
+      document.getElementById('flags').innerHTML = fl.map((f) =>
+        `<a class="flag-row" href="/review?status=flagged&flag=${f}"><span>${FLAG_LABELS[f]}</span>
+         <span class="chip ${s.flags[f] ? 'flag' : ''} tnum">${s.flags[f] || 0}</span></a>`).join('');
+
+      breakdown('bdType', s.breakdown.type, ['short', 'medium', 'long', 'very long']);
+      breakdown('bdTense', s.breakdown.tense, ['Past', 'Non-Past', 'Unknown']);
+      breakdown('bdPolarity', s.breakdown.polarity, ['Affirmative', 'Negative', 'Unknown']);
+
+      const rc = document.getElementById('recent');
+      rc.innerHTML = s.recent.length ? s.recent.map((r) => `
+        <div class="recent-item">
+          <button class="btn play-mini" data-id="${r.id}">▶</button>
+          <a href="/record?id=${encodeURIComponent(r.id)}" class="np" title="${r.nepali}">${r.nepali}</a>
+          <span class="muted tnum" style="font-size:13px"><span class="mono">${r.id}</span> · ${r.duration.toFixed(1)}s · ${r.recorded_at.slice(11, 16)}
+            ${r.flags.length ? `<span class="chip flag" style="height:22px;margin-left:6px">⚠ ${r.flags.length}</span>` : ''}</span>
+        </div>`).join('') : '<div class="empty">No recordings yet.</div>';
+      rc.querySelectorAll('.play-mini').forEach((b) => b.addEventListener('click', () => playClip(b.dataset.id, b)));
+    })().catch((e) => toast(e.message, 'err'));
+  </script>
+</body>
+</html>
