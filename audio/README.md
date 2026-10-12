@@ -47,21 +47,12 @@ audio/
 
 ---
 
-## 🚀 Running the Studio Applications
+## 🚀 Running the Studio Application
 
-### Option A: Standalone Gradio Studio (`app.py`)
-Provides a lightweight interface for filtering sentences (Unrecorded / Recorded), playback, and browser microphone recording:
+Provides an interface for filtering sentences (Unrecorded / Recorded), playback, and browser microphone recording:
 ```bash
 pip install gradio
 python app.py
-```
-Open **`http://127.0.0.1:7865`** in your browser.
-
-### Option B: FastAPI Studio with DSP Pipeline (`studio/server.py`)
-Provides an advanced recording interface with automatic mouse-click trimming, speech-rate calculation, clipping detection, and loudness normalization:
-```bash
-pip install fastapi uvicorn numpy
-python studio/server.py
 ```
 Open **`http://127.0.0.1:7865`** in your browser.
 
@@ -84,8 +75,3 @@ Each recorded clip in `data/<sentence_id>.mp3` has quality metrics logged in `st
   }
 }
 ```
-
----
-
-## 📄 License & Attribution
-Part of the **NepTam: Nepali-Tamang Parallel Corpus and Baseline Experiments** project by Kathmandu University's **DOAI & ILPRL**. Accepted at **LREC 2026**.
